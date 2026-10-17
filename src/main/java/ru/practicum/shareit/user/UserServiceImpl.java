@@ -3,6 +3,7 @@ package ru.practicum.shareit.user;
 import jakarta.validation.Validator;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import ru.practicum.shareit.user.dto.UserDto;
 
@@ -10,6 +11,7 @@ import java.util.List;
 import java.util.Objects;
 
 @Service
+@Transactional
 public class UserServiceImpl implements UserService {
     private final UserRepository repository;
     private final Validator validator;
@@ -20,7 +22,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public synchronized UserDto create(UserDto dto) {
+    public UserDto create(UserDto dto) {
         ensureEmailUnique(dto.getEmail(), null);
         User user = UserMapper.toModel(dto);
         user.setId(null);
@@ -28,7 +30,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public synchronized UserDto update(long id, UserDto dto) {
+    public UserDto update(long id, UserDto dto) {
         User user = getModel(id);
         if (dto.getName() != null) {
             validateProperty(dto, "name");
@@ -69,8 +71,9 @@ public class UserServiceImpl implements UserService {
     }
 
     private void ensureEmailUnique(String email, Long currentId) {
-        boolean exists = repository.findAll().stream()
-                .anyMatch(user -> user.getEmail().equals(email) && !Objects.equals(user.getId(), currentId));
+        boolean exists = repository.findByEmail(email)
+                .filter(user -> !Objects.equals(user.getId(), currentId))
+                .isPresent();
         if (exists) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already in use");
         }
