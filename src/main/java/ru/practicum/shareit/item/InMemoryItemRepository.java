@@ -5,6 +5,7 @@ import ru.practicum.shareit.item.model.Item;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,7 +31,24 @@ public class InMemoryItemRepository implements ItemRepository {
     }
 
     @Override
-    public List<Item> findAll() {
-        return items.values().stream().sorted(Comparator.comparing(Item::getId)).toList();
+    public List<Item> findByOwnerId(long ownerId) {
+        return items.values().stream()
+                .filter(item -> item.getOwner().getId() == ownerId)
+                .sorted(Comparator.comparing(Item::getId))
+                .toList();
+    }
+
+    @Override
+    public List<Item> searchAvailable(String text) {
+        if (text == null || text.isBlank()) {
+            return List.of();
+        }
+        String query = text.toLowerCase(Locale.ROOT);
+        return items.values().stream()
+                .filter(item -> Boolean.TRUE.equals(item.getAvailable()))
+                .filter(item -> item.getName().toLowerCase(Locale.ROOT).contains(query)
+                        || item.getDescription().toLowerCase(Locale.ROOT).contains(query))
+                .sorted(Comparator.comparing(Item::getId))
+                .toList();
     }
 }

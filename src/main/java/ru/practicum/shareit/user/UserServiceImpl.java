@@ -62,10 +62,10 @@ public class UserServiceImpl implements UserService {
         repository.deleteById(id);
     }
 
-    @Override
-    public User getModel(long id) {
+    private User getModel(long id) {
         return repository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "User with id " + id + " not found"));
     }
 
     private void ensureEmailUnique(String email, Long currentId) {

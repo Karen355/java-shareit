@@ -10,5 +10,7 @@ public interface ItemRepository {
 
     Optional<Item> findById(long id);
 
-    List<Item> findAll();
+    List<Item> findByOwnerId(long ownerId);
+
+    List<Item> searchAvailable(String text);
 }

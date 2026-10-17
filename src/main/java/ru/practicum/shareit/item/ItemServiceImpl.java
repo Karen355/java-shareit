@@ -6,18 +6,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import ru.practicum.shareit.item.dto.ItemDto;
 import ru.practicum.shareit.item.model.Item;
-import ru.practicum.shareit.user.UserService;
+import ru.practicum.shareit.user.User;
+import ru.practicum.shareit.user.UserRepository;
 
 import java.util.List;
-import java.util.Locale;
 
 @Service
 public class ItemServiceImpl implements ItemService {
     private final ItemRepository repository;
-    private final UserService users;
+    private final UserRepository users;
     private final Validator validator;
 
-    public ItemServiceImpl(ItemRepository repository, UserService users, Validator validator) {
+    public ItemServiceImpl(ItemRepository repository, UserRepository users, Validator validator) {
         this.repository = repository;
         this.users = users;
         this.validator = validator;
@@ -25,14 +25,14 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public ItemDto create(long ownerId, ItemDto dto) {
-        Item item = ItemMapper.toModel(dto, users.getModel(ownerId));
+        Item item = ItemMapper.toModel(dto, findUser(ownerId));
         item.setId(null);
         return ItemMapper.toDto(repository.save(item));
     }
 
     @Override
     public ItemDto update(long ownerId, long itemId, ItemDto dto) {
-        users.getModel(ownerId);
+        findUser(ownerId);
         Item item = find(itemId);
         if (item.getOwner().getId() != ownerId) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the owner may update an item");
@@ -62,30 +62,29 @@ public class ItemServiceImpl implements ItemService {
 
     @Override
     public List<ItemDto> getOwnerItems(long ownerId) {
-        users.getModel(ownerId);
-        return repository.findAll().stream()
-                .filter(item -> item.getOwner().getId() == ownerId)
+        findUser(ownerId);
+        return repository.findByOwnerId(ownerId).stream()
                 .map(ItemMapper::toDto)
                 .toList();
     }
 
     @Override
     public List<ItemDto> search(String text) {
-        if (text == null || text.isBlank()) {
-            return List.of();
-        }
-        String query = text.toLowerCase(Locale.ROOT);
-        return repository.findAll().stream()
-                .filter(item -> Boolean.TRUE.equals(item.getAvailable()))
-                .filter(item -> item.getName().toLowerCase(Locale.ROOT).contains(query)
-                        || item.getDescription().toLowerCase(Locale.ROOT).contains(query))
+        return repository.searchAvailable(text).stream()
                 .map(ItemMapper::toDto)
                 .toList();
     }
 
     private Item find(long itemId) {
         return repository.findById(itemId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Item not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Item with id " + itemId + " not found"));
+    }
+
+    private User findUser(long userId) {
+        return users.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "User with id " + userId + " not found"));
     }
 
     private void validateProperty(ItemDto dto, String property) {
