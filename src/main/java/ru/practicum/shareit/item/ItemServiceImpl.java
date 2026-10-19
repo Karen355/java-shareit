@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import ru.practicum.shareit.booking.BookingRepository;
 import ru.practicum.shareit.booking.BookingStatus;
+import ru.practicum.shareit.booking.Booking;
 import ru.practicum.shareit.item.dto.CommentDto;
 import ru.practicum.shareit.item.dto.CreateCommentDto;
 import ru.practicum.shareit.item.dto.ItemDto;
@@ -18,6 +19,8 @@ import ru.practicum.shareit.user.UserRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -87,15 +90,31 @@ public class ItemServiceImpl implements ItemService {
     @Override
     public List<OwnerItemDto> getOwnerItems(long ownerId) {
         findUser(ownerId);
+        List<Item> items = repository.findByOwner_IdOrderByIdAsc(ownerId);
+        if (items.isEmpty()) {
+            return List.of();
+        }
+        List<Long> itemIds = items.stream().map(Item::getId).toList();
+        Map<Long, List<Booking>> bookingsByItem = bookings.findByItemsAndStatus(itemIds, BookingStatus.APPROVED)
+                .stream().collect(Collectors.groupingBy(booking -> booking.getItem().getId()));
+        Map<Long, List<CommentDto>> commentsByItem = comments.findByItems(itemIds).stream()
+                .collect(Collectors.groupingBy(comment -> comment.getItem().getId(),
+                        Collectors.mapping(CommentMapper::toDto, Collectors.toList())));
         LocalDateTime now = LocalDateTime.now();
-        return repository.findByOwner_IdOrderByIdAsc(ownerId).stream()
-                .map(item -> ItemMapper.toOwnerDto(item,
-                        bookings.findTopByItem_IdAndStatusAndStartBeforeOrderByStartDesc(
-                                item.getId(), BookingStatus.APPROVED, now).orElse(null),
-                        bookings.findTopByItem_IdAndStatusAndStartAfterOrderByStartAsc(
-                                item.getId(), BookingStatus.APPROVED, now).orElse(null),
-                        getComments(item.getId())))
-                .toList();
+        return items.stream().map(item -> {
+            Booking last = null;
+            Booking next = null;
+            for (Booking booking : bookingsByItem.getOrDefault(item.getId(), List.of())) {
+                if (booking.getStart().isBefore(now) && last == null) {
+                    last = booking;
+                }
+                if (booking.getStart().isAfter(now)) {
+                    next = booking;
+                }
+            }
+            return ItemMapper.toOwnerDto(item, last, next,
+                    commentsByItem.getOrDefault(item.getId(), List.of()));
+        }).toList();
     }
 
     @Override
@@ -116,12 +135,7 @@ public class ItemServiceImpl implements ItemService {
                 itemId, authorId, BookingStatus.APPROVED, LocalDateTime.now())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No completed booking for this item and user");
         }
-        Comment comment = new Comment();
-        comment.setText(dto.getText());
-        comment.setItem(item);
-        comment.setAuthor(author);
-        comment.setCreated(LocalDateTime.now());
-        return CommentMapper.toDto(comments.save(comment));
+        return CommentMapper.toDto(comments.save(CommentMapper.toModel(dto, item, author)));
     }
 
     private List<CommentDto> getComments(long itemId) {

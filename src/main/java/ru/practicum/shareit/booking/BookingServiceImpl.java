@@ -40,18 +40,11 @@ public class BookingServiceImpl implements BookingService {
         if (!Boolean.TRUE.equals(item.getAvailable())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Item is not available");
         }
-        LocalDateTime now = LocalDateTime.now();
         if (dto.getStart() == null || dto.getEnd() == null
-                || !dto.getStart().isAfter(now) || !dto.getEnd().isAfter(dto.getStart())) {
+                || !dto.getEnd().isAfter(dto.getStart())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid booking dates");
         }
-        Booking booking = new Booking();
-        booking.setStart(dto.getStart());
-        booking.setEnd(dto.getEnd());
-        booking.setItem(item);
-        booking.setBooker(booker);
-        booking.setStatus(BookingStatus.WAITING);
-        return BookingMapper.toDto(bookings.save(booking));
+        return BookingMapper.toDto(bookings.save(BookingMapper.toModel(dto, item, booker)));
     }
 
     @Override

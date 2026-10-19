@@ -98,6 +98,31 @@ class BookingIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(1)));
     }
 
+    @Test
+    void bookingDatesAreValidatedAndErrorsHaveACommonShape() throws Exception {
+        long ownerId = createUser("Date owner", "booking.date.owner@example.com");
+        long bookerId = createUser("Date booker", "booking.date.booker@example.com");
+        long itemId = createItem(ownerId);
+        LocalDateTime past = LocalDateTime.now().minusDays(1);
+        LocalDateTime future = LocalDateTime.now().plusDays(1);
+
+        mvc.perform(post("/bookings").header("X-Sharer-User-Id", bookerId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(new BookingInput(itemId, past, future))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").isString());
+        mvc.perform(post("/bookings").header("X-Sharer-User-Id", bookerId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(new BookingInput(itemId, future, past))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").isString());
+        mvc.perform(post("/bookings").header("X-Sharer-User-Id", bookerId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(new BookingInput(itemId, future, future))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Invalid booking dates"));
+    }
+
     private long createUser(String name, String email) throws Exception {
         String response = mvc.perform(post("/users").contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(new UserInput(name, email))))
