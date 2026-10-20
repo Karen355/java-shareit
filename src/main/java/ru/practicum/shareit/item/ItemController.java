@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ru.practicum.shareit.item.dto.ItemDto;
+import ru.practicum.shareit.item.dto.ItemDetailsDto;
+import ru.practicum.shareit.item.dto.OwnerItemDto;
+import ru.practicum.shareit.item.dto.CommentDto;
+import ru.practicum.shareit.item.dto.CreateCommentDto;
 
 import java.util.List;
 
@@ -39,13 +43,14 @@ public class ItemController {
     }
 
     @GetMapping("/{itemId}")
-    public ItemDto get(@PathVariable long itemId) {
+    public ItemDetailsDto get(@PathVariable long itemId,
+                              @RequestHeader(value = "X-Sharer-User-Id", required = false) Long viewerId) {
         log.info("Getting item id={}", itemId);
-        return service.get(itemId);
+        return service.get(itemId, viewerId);
     }
 
     @GetMapping
-    public List<ItemDto> getOwnerItems(@RequestHeader("X-Sharer-User-Id") long ownerId) {
+    public List<OwnerItemDto> getOwnerItems(@RequestHeader("X-Sharer-User-Id") long ownerId) {
         log.info("Getting items for user id={}", ownerId);
         return service.getOwnerItems(ownerId);
     }
@@ -54,5 +59,12 @@ public class ItemController {
     public List<ItemDto> search(@RequestParam String text) {
         log.info("Searching items by text={}", text);
         return service.search(text);
+    }
+
+    @PostMapping("/{itemId}/comment")
+    public CommentDto addComment(@RequestHeader("X-Sharer-User-Id") long authorId,
+                                 @PathVariable long itemId, @Valid @RequestBody CreateCommentDto dto) {
+        log.info("Adding comment to item id={} by user id={}", itemId, authorId);
+        return service.addComment(authorId, itemId, dto);
     }
 }
